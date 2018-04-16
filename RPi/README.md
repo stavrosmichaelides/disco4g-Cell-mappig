@@ -84,6 +84,21 @@ logger_syslog=-1
 logger_syslog_level=1
 EOF
 
+# set hostapd.conf system variable for correctness
+# but we actually are not going to use hostapd init script
+# as we start hostapd when hotplugging wlan0 interface
+sed -i -- 's/^#DAEMON_CONF=""/DAEMON_CONF="\/etc\/hostapd\/hostapd.conf"/g' /etc/default/hostapd 
+systemctl stop hostapd
+systemctl disable hostapd
+
+# deny dhcpc wlan interface management
+# as otherwise it causes problems with starting hostapd
+# shell variables required:
+# IFACE
+
+echo "denyinterfaces $IFACE" >> /etc/dhcpcd.conf
+systemctl restart dhcpcd 
+
 # lookup your SC2 macaddr
 # method 1: telnet 192.168.42.1 (while connected to Disco AP) and run ulogcat while powering on SC2
 # you should see Controller IP & Mac address lines appearing in log output
@@ -104,10 +119,10 @@ cat << EOF > /etc/network/interfaces.d/${IFACE}
 allow-hotplug $IFACE
 auto $IFACE
 iface $IFACE inet static
-hostapd /etc/hostapd/hostapd.conf
 address 192.168.42.200
 netmask 255.255.255.0
 post-up /usr/local/bin/$IFACE-routes
+hostapd /etc/hostapd/hostapd.conf
 EOF
 
 # create wifi interface route file (for enabling backroute to SC2_IPADDR)
@@ -124,7 +139,7 @@ EOF
 # make route script executable
 chmod +x /usr/local/bin/$IFACE-routes
 
-# bring wlanX up and start hostapd
+# bring wlanX (and hostapd) up
 ifup $IFACE
 
 # create dnsmasq dhcp server configuration for PISCO AP
@@ -283,8 +298,7 @@ We are using packet mangling DNAT/SNAT rules to direct SC2->PISCO connections to
 Theory of operation:
 * there is routed access to 192.168.42.1 (real DISCO over tinc/LTE)
 * everything sent to DISCO (ie 192.168.42.1) should be faked to be sent by RPI_VPN_IPADDR (SC2 fake IP, as seen by real Disco over LTE)
-* everything sent back to RPI_VPN_IPADDR (ie to SC2 fake IP) should be forwarded to real SC2 IP
-* everything forwarded back to real SC2 IP should be faked to be sent by 192.168.42.1 (real DISCO)
+* everything sent back to RPI_VPN_IPADDR from Disco (ie to SC2 fake IP) should be forwarded to real SC2 IP
 
 ```bash
 # set variables to be used
@@ -313,8 +327,8 @@ iptables -F -t nat
 
 iptables -P FORWARD ACCEPT
 iptables -t nat -A POSTROUTING -d 192.168.42.1 -j SNAT --to-source $RPI_VPN_IPADDR
-iptables -t nat -A PREROUTING -d $RPI_VPN_IPADDR -j DNAT --to-destination $SC2_IPADDR
-iptables -t nat -A POSTROUTING -d $SC2_IPADDR -j SNAT --to-source 192.168.42.1
+iptables -t nat -A PREROUTING -s 192.168.42.1 -d $RPI_VPN_IPADDR -j DNAT --to-destination $SC2_IPADDR
+iptables -t nat -A PREROUTING -s $DISCO_VPN_IPADDR -d $RPI_VPN_IPADDR -j DNAT --to-destination $SC2_IPADDR
 
 # verify rules and policies
 iptables -L -n
@@ -404,4 +418,97 @@ sed -i.bak 's/^EnableLogging=0/EnableLogging=1/' /etc/usb_modeswitch.conf
 # 4G dongle in router mode should configure and bring up eth1
 # with default route to 4G internet connection - with higher metric value usually
 # - which means that if you have any other default routes they might still take priority
+```
+
+## Optional
+### HiLINK status dashboard
+
+Huawei e3372 4G USB dongles have API interface where connection status information can be fetched. hilink-status script does provide some insights into connection details and can monitor link and participating endpoints with the help of ping-monitor instances. If RPi has LCD screen then hilink-status could be run on bootup as permanent status dashboard.
+
+Hardware components used:
+* https://www.waveshare.com/product/modules/oleds-lcds/raspberry-pi-lcd/3.5inch-rpi-lcd-a.htm
+
+![hilink_status_dashboard](../images/hilink-status-dashboard.png)
+
+Installation:
+```bash
+# install 3.5" LCD driver
+apt-get install git
+git clone https://github.com/goodtft/LCD-show.git
+cd LCD-show
+chmod +x LCD35-show
+sudo ./LCD35-show
+
+# enable console auto-login for pi user
+su - pi
+sudo raspi-config
+* Choose option 3: Boot Options
+* Choose option B1: Desktop / CLI
+* Choose option B2: Console Autologin
+* Select Finish, and reboot the pi.
+
+# prepare for scripts
+apt-get install libxml2-utils
+cd /usr/local/bin/
+
+# install hilink-status script
+curl -L -O https://raw.githubusercontent.com/mainframe/disco4g/master/RPi/bin/hilink-status
+chmod +x hilink-status
+# NB! Review and modify IP addreses used in hilink-status script
+# - if using different IPs in your setup
+
+# install ping-monitor helper script
+curl -L -O https://raw.githubusercontent.com/mainframe/disco4g/master/RPi/bin/ping-monitor
+chmod +x ping-monitor
+
+# trigger ping-monitors and hilink-status dashboard from pi user .bashrc
+su - pi
+cat << 'EOF' >> ~/.bashrc
+# --- hilink-status mod start ---
+# disable console screen blanking
+setterm -blank 0
+# suppress system warning/error messages
+sudo dmesg -n 1
+# launch ping-monitors
+# cloud VPN host
+/usr/local/bin/ping-monitor 192.168.42.11 &
+# disco
+/usr/local/bin/ping-monitor 192.168.42.1 &
+# SC2
+/usr/local/bin/ping-monitor 192.168.42.50 &
+# set larger font
+setfont /usr/share/consolefonts/Uni3-TerminusBold24x12.psf.gz
+# run hilink status inside screen
+screen -t "hilink-status" bash -c "watch -c -t /usr/local/bin/hilink-status"
+# --- hilink-status mod end ---
+EOF
+```
+
+### speedtest.net cli utility
+
+Useful for testing 4G link speed.
+
+Installation:
+```bash
+cd /usr/local/bin
+curl -o speedtest-cli https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py
+chmod +x speedtest-cli
+```
+
+Usage:
+```bash
+# IF you are on RPi ethernet connection and it sets default route
+# you need to kill RPi dhcp client daemon and remove default route via LAN gw
+ip route
+
+# set your LAN gw (to be removed)
+LAN_GW="192.168.1.254"
+
+# kill dhcp client daemon - so that route can be removed
+kill -s SIGTERM $( pidof dhcpcd )
+# remove default route
+ip route del default via $LAN_GW
+
+# run speedtest
+speedtest-cli
 ```
