@@ -12,7 +12,59 @@ Currently RPi is required in order to pretend as another Disco drone to SC2 and 
 
 ### Raspbian installation
 
-https://hackernoon.com/raspberry-pi-headless-install-462ccabd75d0
+* https://www.raspberrypi.org/documentation/installation/installing-images/ 
+* https://downloads.raspberrypi.org/raspbian_lite_latest
+* https://hackernoon.com/raspberry-pi-headless-install-462ccabd75d0
+
+```bash
+# download latest raspbian OS image
+curl -O https://downloads.raspberrypi.org/raspbian_lite_latest
+unzip 2018-04-18-raspbian-stretch-lite.zip
+
+# download and install etcher.io image installer
+https://etcher.io
+
+# fire up etcher.io app and flash downloaded Raspbian image to microSD card
+
+# Add "ssh" File to the SD card boot filesystem (this is MacOSX specific example here)
+sudo touch /Volumes/boot/ssh
+
+# boot raspbian
+# lookup RPi DHCP IP from LAN router (or monitor network with tcpdump)
+# login with pi:raspberry
+ssh pi@<rpi_ipaddr>
+
+# NB! Change default password!
+passwd
+
+# change to root user
+sudo su -
+
+# set root user passwd as well
+passwd
+
+# enable root user ssh login
+vi /etc/ssh/sshd_config
+--- MODIFY ---
+PermitRootLogin yes
+--- MODIFY ---
+
+# update OS
+apt-get update
+apt-get upgrade
+
+# install screen, vim
+apt-get install screen vim
+
+# disable rootfs filechecks on boot
+vim /etc/fstab
+--- MODIFY ---
+PARTUUID=e4ffb18f-02  /               ext4    defaults,noatime  0       0
+--- MODIFY ---
+
+# reboot for sshd config changes and possible kernel updates
+reboot
+```
 
 ### General configuration
 
@@ -53,9 +105,22 @@ echo $DISCO_IE
 # NB! Change DISCO name to PISCO
 # AND increment by +1 last digit of DISCO_ID and 3rd digit from backwards of DISCO_IE value 
 # (increment the Y char in examples)
-
+# final results should be having following format/changes
 PISCO_ID="PISCO-XXXXXY"
 PISCO_IE="DDXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXY00"
+
+# producing PISCO_ID
+DISCO_BASE=${DISCO_ID:0:-1}
+DISCO_INCR=${DISCO_ID: -1}
+let DISCO_INCR+=1
+PISCO_INCR=${DISCO_INCR: -1}
+PISCO_ID="PISCO-${DISCO_BASE}${PISCO_INCR}"
+echo $PISCO_ID
+
+# producing PISCO_IE
+DISCO_IE_BASE=${DISCO_IE:0:-3}
+PISCO_IE="${DISCO_IE_BASE}${PISCO_INCR}00"
+echo $PISCO_IE
 
 # install software for creating PISCO Access Point
 apt-get install hostapd dnsmasq wpasupplicant
@@ -139,9 +204,6 @@ EOF
 # make route script executable
 chmod +x /usr/local/bin/$IFACE-routes
 
-# bring wlanX (and hostapd) up
-ifup $IFACE
-
 # create dnsmasq dhcp server configuration for PISCO AP
 # shell variables required:
 # IFACE
@@ -159,6 +221,9 @@ EOF
 
 # (re)start dnsmasq service
 systemctl restart dnsmasq
+
+# bring wlanX (and hostapd) up
+ifup $IFACE
 ```
 
 ### Setup drone discovery over zeroconf 
@@ -240,6 +305,8 @@ Name = rpi
 AddressFamily = ipv4
 Interface = tun0
 ConnectTo = cloud
+PriorityInheritance = yes
+ProcessPriority = high
 EOF
 
 # create vpn up script
@@ -248,13 +315,13 @@ EOF
 
 cat << EOF > /etc/tinc/vpn0/tinc-up
 ifconfig \$INTERFACE $NODE_VPN_IPADDR netmask 255.255.255.0
-ip route add 192.168.42.0/24 dev tun0 proto kernel scope link src $NODE_VPN_IPADDR metric 200
-ip route del 192.168.42.0/24 dev tun0 proto kernel scope link src $NODE_VPN_IPADDR
-ip route add 192.168.42.1 dev tun0
+ip route add 192.168.42.0/24 dev \$INTERFACE proto kernel scope link src $NODE_VPN_IPADDR metric 200
+ip route del 192.168.42.0/24 dev \$INTERFACE proto kernel scope link src $NODE_VPN_IPADDR
+ip route add 192.168.42.1 dev \$INTERFACE
 EOF
 
 # add peer routes
-for PEER in $PEER_VPN_NODES; do echo "route add $PEER dev $INTERFACE" >> etc/tinc/tinc-up; done
+for PEER in $PEER_VPN_NODES; do echo "ip route add $PEER dev \$INTERFACE" >> /etc/tinc/vpn0/tinc-up; done
 
 # create vpn down script
 cat << 'EOF' > /etc/tinc/vpn0/tinc-down
@@ -448,7 +515,7 @@ sudo raspi-config
 * Select Finish, and reboot the pi.
 
 # prepare for scripts
-apt-get install libxml2-utils
+apt-get install libxml2-utils bc
 cd /usr/local/bin/
 
 # install hilink-status script
