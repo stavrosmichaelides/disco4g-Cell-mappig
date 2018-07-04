@@ -1,0 +1,328 @@
+<html>
+<head>
+  <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no' />
+  <title>Mapbox</title>
+  <script src="https://api.tiles.mapbox.com/mapbox-gl-js/v0.45.0/mapbox-gl.js"></script>
+  <script src="https://cdn.rawgit.com/iamphi/GPS.js/master/gps.js"></script>
+  <script
+			  src="https://code.jquery.com/jquery-3.3.1.min.js"
+			  integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+			  crossorigin="anonymous"></script>
+
+  <link href="https://api.tiles.mapbox.com/mapbox-gl-js/v0.45.0/mapbox-gl.css" rel="stylesheet">
+  <style>
+
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+
+    #infoBox {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      background: rgba(255, 255, 255, 0.8);
+      margin-bottom: 30px;
+      margin-left: 30px;
+      overflow: auto;
+      border-radius: 3px;
+      border: solid 1px goldenrod;
+    }
+  </style>
+</head>
+<body>
+  <div id="map" class="mapboxgl-map">
+  </div>
+  <div id="infoBox">
+    <p id="lteData" />
+    <p id="telemetry" />
+    <div>
+      <button type="button" onclick="stopTracking()">Stop</button>
+      <button type="button" onclick="startTracking()">Start</button>
+    </div>
+    <div>
+        <input id='pointSlider' type='range' min='0' max='0' step='1' value='0' />
+        <label id='maxLabel'></label>
+    </div>
+    </div>
+  </div>
+  <script>
+    opencellIdToken = localStorage.getItem("uavpal-opencellidToken");
+
+    mapboxgl.accessToken = localStorage.getItem("uavpal-mapboxToken");
+    var map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/streets-v9',
+      zoom: 14
+    });
+
+    var dronePosition = {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": []
+      }
+    };
+
+    var cellTowerPosition = {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": []
+      }
+    };
+
+    var dronePath = {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": []
+          }
+        }
+      ]
+    };
+
+    var cellTowerConnection = {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": []
+          }
+        }
+      ]
+    };
+    
+    var lteTelemetry = {
+      "type": "FeatureCollection",
+      "features": []
+    };
+
+    map.on('load', function () {
+      map.loadImage("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACMAAAAZCAYAAAC7OJeSAAACyklEQVRIicWWP2vqYBSHT6RxaINYLaEVt1AcsgmdugpphXR36CQIdRAydOquKET6AVraRT+E+gWEfAQ/gLPUQfzz3OEmqa1X69Xe3h+cIeG8v/dJ3pNzIrKnarUauq5Tq9XY12svOY6DiIRxd3f3f4AeHx85OTkhGo3y8PBANBpFRHBd92eBut0umqYhIjw/P5MkwtPTEyJCOp2m2+3+DFC73UZV1fBoAJJEABARDg8PUVWVdrv9b4GazSaKonyokySRMAIYEUFRFJrN5r8Bur+/Dzfx62ItjOu6IbS/7vt0e3uLiKCqKq1WKzySdTAArVYrPE5//f6yLAsRQdM0Op0OgWRDzQTqdDphofs+u+vi4gIRQdd1PM9jWdvAAHieh67riAi+39/r/PwcEcEwDAaDAZ+1DLN87zMMwGAwwDAMRATfd3udnp4iImSzWYbD4Yr538IADIdDstksIoLv/7VisRgiQi6XYzQa/dF4FxiA0WhELpdDRPD3Wa+gpRcKBSaTyVrTXWEAJpMJhUIBEQlGyKqCvuA4DovFYqPhPjAAi8WCYMhGIpEVIBRFodFofGn0HTCBGo3GckcXSSaTiAivr69bm3wXDMDLy8vv5plMIsEsGY/HWxvM5/ONMPP5fGuvt7e395m2DcxsNsPzPFzX5ebmhuPj440w8Xgc27ZxXRfP85jNZmu9x+PxZpjpdEq/36der5PP54PP8EOk02kuLy9xHAcgLMijo6OV3FgsRj6fp16v0+/3mU6nm99Mr9ejWq1iWVY4T5bDMAyKxeKHyj84OPiQ41+HKhaLYeddDk3TsCyLarVKr9d7h0kkEivJIkImk6FUKn3ZKa+urtB1nevr6y9zS6USmUzmj/v5HCKJRALTNCmXyz/6/1oulzFN8x1kF1UqFVKp1NqoVCo/+lBi2zamaZJKpYjH45ydnWGaJrZt7wzyC9GA4lCxaRHEAAAAAElFTkSuQmCC", function (error, image) {
+        map.addImage('disco', image);
+
+        map.addLayer({
+          "id": "drone",
+          "type": "symbol",
+          "source": "drone",
+          "layout": {
+            "icon-image": "disco",
+            "icon-size": [
+              "interpolate", ["linear"], ["zoom"],
+              4, 0.1,
+              14, 1.0
+            ],
+            "icon-rotation-alignment": "map"
+          }
+        });
+      });
+
+     
+      map.addSource('drone', {
+        "type": 'geojson',
+        "data": dronePosition
+      });
+
+      map.addSource('cellTowerPosition', {
+        "type": 'geojson',
+        "data": cellTowerPosition
+      });
+      
+      map.addSource('cellTowerConnection', {
+        "type": 'geojson',
+        "data": cellTowerConnection
+      });
+
+      map.addSource('track', {
+        "type": 'geojson',
+        "data": dronePath
+      });
+      
+      map.addSource('lteTelemetry', {
+        "type": "geojson",
+        "data": lteTelemetry
+      });
+      
+      map.addLayer({
+        "id": "track",
+        "type": "line",
+        "source": "track",
+        "paint": {
+          "line-color": "yellow",
+          "line-opacity": 0.50,
+          "line-width": 5
+        }
+      });
+
+      map.addLayer({
+        "id": "cellTowerPosition",
+        "type": "symbol",
+        "source": "cellTowerPosition",
+        "layout": {
+          "icon-image": "monument-15",
+           "icon-size": [
+              "interpolate", ["linear"], ["zoom"],
+              4, 0.1,
+              14, 1.0
+            ],
+        }
+      });
+
+      map.addLayer({
+        "id": "cellTowerConnection",
+        "type": "line",
+        "source": "cellTowerConnection",
+        "paint": {
+          "line-color": "blue",
+          "line-opacity": 0.50,
+          "line-width": 2
+        }
+      });
+      
+      rgba = (r, g, b, a) => { 
+        return `rgba(${r}, ${g}, ${b}, ${a})`;
+      }
+
+      radialGradient = (r, g, b, a) => {
+        return `radial-gradient(${rgba(r, g, b, a)}, ${rgba(r, g, b, a/4)}, ${rgba(r, g, b, a/8)})`;
+      }
+    map.addLayer({
+        "id": "lte-signal",
+        "type": "circle",
+        "source": "lteTelemetry",
+        "paint": {
+           "circle-radius": [
+              "interpolate", ["linear"], ["zoom"],
+              4, 1,
+              14, 8,
+              16, 10
+           ],
+           "circle-color": {
+              "property" : "bar",
+              "stops": [
+                [1, "rgba(255,   0, 0, 0.4)"],
+                [2, "rgba(100,  60, 0, 0.4)"],
+                [3, "rgba(255, 255, 0, 0.4)"],
+                [4, "rgba(100, 255, 0, 0.4)"],
+                [5, "rgba(  0, 255, 0, 0.4)"]
+              ]
+            },
+        }
+      });
+
+      var url = new URL(window.location.href);
+      var discozip = url.searchParams.get("discozip");
+
+      if (!discozip) {
+        discozip = "192.168.42.1";
+      }
+      var wsUrl = new URL("ws://" + discozip);
+
+      var gpsSocket = null;
+
+      var lteData = document.getElementById('lteData');
+      var telemetry = document.getElementById('telemetry');
+
+      function getCellIdInfo(cellLacCid) { 
+        key = cellLacCid.lac+"-"+cellLacCid.cid;
+        retval = localStorage.getItem(key);
+        if(retval == null) {
+          //TODO: fix mcc and mnc
+          var settings = {
+            "async": false,
+            "crossDomain": true,
+            "url": "https://us2.unwiredlabs.com/v2/process.php",
+            "method": "POST",
+            "headers": {},
+            "processData": false,
+            "data": `{ "token": opencellIdToken, "radio": "gsm", "mcc": 310, "mnc": 260, "cells": [{ "lac": ${cellLacCid.lac}, "cid": ${cellLacCid.cid} }] }`
+          }
+
+         $.ajax(settings).done(function (response) {
+            localStorage.setItem(key, response);
+            retval = localStorage.getItem(key);
+          });
+
+          retval = $.parseJSON($.ajax(settings).responseText);
+          localStorage.setItem(key, JSON.stringify(retval));
+        } else { 
+          retval = $.parseJSON(retval);
+        }
+
+        return retval;
+      }
+
+      window.stopTracking = () => {
+        gpsSocket.close();
+      };
+
+
+      window.startTracking = () => {
+        gpsSocket = new WebSocket(wsUrl.href);
+        map.zoomTo(16);
+        var gps = new GPS;
+        gps.on('data', function (parsed) {
+          var coord = [parsed.lon, parsed.lat];
+          dronePosition.geometry.coordinates = coord;
+          dronePath.features[0].geometry.coordinates.push(coord);
+          
+          lteTelemetry.features.push({
+            "type": "Feature", 
+            "properties": parsed.extra, 
+            "geometry": { "type": "Point", "coordinates": coord }
+          });
+
+          telemetry.innerHTML = `speed:${parsed.speed}<br/>heading:${parsed.track}`; 
+          map.setLayoutProperty('drone', 'icon-rotate', parsed.track);
+          map.getSource('drone').setData(dronePosition);
+          map.getSource('track').setData(dronePath);
+          map.getSource('lteTelemetry').setData(lteTelemetry);
+
+          //TODO: fix lac
+          cellInfo = getCellIdInfo({
+              "lac": 12110,
+              "cid": parsed.extra.cellid
+          });
+
+          cellTowerPosition.geometry.coordinates = [cellInfo.lon, cellInfo.lat];
+          map.getSource('cellTowerPosition').setData(cellTowerPosition);
+
+          cellTowerConnection.features[0].geometry.coordinates = [coord, [cellInfo.lon, cellInfo.lat] ];
+          map.getSource('cellTowerConnection').setData(cellTowerConnection);
+
+          map.panTo(coord);
+
+          $('#pointSlider').attr('max', dronePath.features[0].geometry.coordinates.length+1);
+          $('#pointSlider').on('input', function () {
+            $('#maxLabel').html($('#pointSlider').val());
+          });
+
+        });
+
+        gpsSocket.onmessage = (event) => {
+          datums = event.data.split("LTE:");
+          gnrmcRaw = datums[0];
+          lte = datums[1];          
+          lteDatums = lte.split(" ");
+          
+          lteData.innerHTML = "LTE:" + lte;
+
+          gnrmcClean = gnrmcRaw.replace(/^[GNRMC]+\,/, '$GNRMC,');
+          gps.update(gnrmcClean, {
+            bar : parseInt(lteDatums[0]),
+            cellid : lteDatums[5]
+          });
+          //console.log(gnrmcClean);
+        }
+      };
+    });</script>
+</body>
+</html>

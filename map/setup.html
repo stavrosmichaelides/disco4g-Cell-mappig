@@ -1,0 +1,44 @@
+<html>
+  <head>
+    <script
+          src="https://code.jquery.com/jquery-3.3.1.min.js"
+          integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+          crossorigin="anonymous"></script>
+    <script>
+      $(document).ready(()=>{
+        var mapboxTokenKey = "uavpal-mapboxToken";
+        var opencellidTokenKey = "uavpal-opencellidToken";
+
+        var mapboxToken = $('#mapboxToken'); 
+        var opencellidToken = $('#opencellidToken'); 
+
+        mapboxToken.val(localStorage.getItem(mapboxTokenKey));
+        opencellidToken.val(localStorage.getItem(opencellidTokenKey));
+
+
+        $('#saveMapboxToken').click(()=> {
+          localStorage.setItem(mapboxTokenKey, mapboxToken.val());
+        });
+
+        $('#saveOpencellidToken').click(()=> {
+          localStorage.setItem(opencellidTokenKey, opencellidToken.val());
+        });
+
+      });
+    </script>
+  </head>
+  <body>
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACMAAAAZCAYAAAC7OJeSAAACyklEQVRIicWWP2vqYBSHT6RxaINYLaEVt1AcsgmdugpphXR36CQIdRAydOquKET6AVraRT+E+gWEfAQ/gLPUQfzz3OEmqa1X69Xe3h+cIeG8v/dJ3pNzIrKnarUauq5Tq9XY12svOY6DiIRxd3f3f4AeHx85OTkhGo3y8PBANBpFRHBd92eBut0umqYhIjw/P5MkwtPTEyJCOp2m2+3+DFC73UZV1fBoAJJEABARDg8PUVWVdrv9b4GazSaKonyokySRMAIYEUFRFJrN5r8Bur+/Dzfx62ItjOu6IbS/7vt0e3uLiKCqKq1WKzySdTAArVYrPE5//f6yLAsRQdM0Op0OgWRDzQTqdDphofs+u+vi4gIRQdd1PM9jWdvAAHieh67riAi+39/r/PwcEcEwDAaDAZ+1DLN87zMMwGAwwDAMRATfd3udnp4iImSzWYbD4Yr538IADIdDstksIoLv/7VisRgiQi6XYzQa/dF4FxiA0WhELpdDRPD3Wa+gpRcKBSaTyVrTXWEAJpMJhUIBEQlGyKqCvuA4DovFYqPhPjAAi8WCYMhGIpEVIBRFodFofGn0HTCBGo3GckcXSSaTiAivr69bm3wXDMDLy8vv5plMIsEsGY/HWxvM5/ONMPP5fGuvt7e395m2DcxsNsPzPFzX5ebmhuPj440w8Xgc27ZxXRfP85jNZmu9x+PxZpjpdEq/36der5PP54PP8EOk02kuLy9xHAcgLMijo6OV3FgsRj6fp16v0+/3mU6nm99Mr9ejWq1iWVY4T5bDMAyKxeKHyj84OPiQ41+HKhaLYeddDk3TsCyLarVKr9d7h0kkEivJIkImk6FUKn3ZKa+urtB1nevr6y9zS6USmUzmj/v5HCKJRALTNCmXyz/6/1oulzFN8x1kF1UqFVKp1NqoVCo/+lBi2zamaZJKpYjH45ydnWGaJrZt7wzyC9GA4lCxaRHEAAAAAElFTkSuQmCC"/>
+    <p>
+    MapBox Token: <br />
+    <input id="mapboxToken" type="text" size=100/>
+    <button id="saveMapboxToken" type="button">Save Mapbox Token</button> <br />
+    <a target="_blank" href="https://www.mapbox.com">https://www.mapbox.com</a>
+
+    <p>
+    OpenCellId Token: <br />
+    <input id="opencellidToken" type="text"/>
+    <button id="saveOpencellidToken" type="button">Save OpenCellId Token</button> <br />
+    <a target="_blank" href="https://opencellid.org">https://opencellid.org</a>
+  </body>
+</html>

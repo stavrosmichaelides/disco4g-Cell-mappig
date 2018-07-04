@@ -119,6 +119,9 @@ ntpd -n -d -q
 ulogger -s -t uavpal_disco "... starting glympse script for GPS tracking"
 /data/ftp/uavpal/bin/uavpal_glympse.sh $huawei_mode &
 
+ulogger -s -t uavpal_disco "... starting websocketd"
+/data/ftp/uavpal/bin/websocketd /data/ftp/uavpal/bin/uavpal_web.sh &
+
 ulogger -s -t uavpal_disco "... starting zerotier daemon"
 /data/ftp/uavpal/bin/zerotier-one -d
 
