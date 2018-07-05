@@ -5,11 +5,8 @@
   <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no' />
   <title>Mapbox</title>
   <script src="https://api.tiles.mapbox.com/mapbox-gl-js/v0.45.0/mapbox-gl.js"></script>
-  <script src="https://cdn.rawgit.com/iamphi/GPS.js/master/gps.js"></script>
-  <script
-			  src="https://code.jquery.com/jquery-3.3.1.min.js"
-			  integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
-			  crossorigin="anonymous"></script>
+  <script src="gps.js"></script>
+  <script src="jquery-3.3.1.min.js"> </script>
 
   <link href="https://api.tiles.mapbox.com/mapbox-gl-js/v0.45.0/mapbox-gl.css" rel="stylesheet">
   <style>
@@ -223,6 +220,7 @@
 
       var url = new URL(window.location.href);
       var discozip = url.searchParams.get("discozip");
+      var trackCellTower = url.searchParams.get("trackCellTower") != 'false';
 
       if (!discozip) {
         discozip = "192.168.42.1";
@@ -246,12 +244,12 @@
             "method": "POST",
             "headers": {},
             "processData": false,
-            "data": `{ 
+            "data": JSON.stringify({ 
               "token": opencellIdToken, 
               "radio": "gsm", 
-              "mcc": mobileprovider.mcc, 
+              "mcc": mobileProvider.mcc, 
               "mnc": mobileProvider.mnc, 
-              "cells": [{ "lac": ${cellLacCid.lac}, "cid": ${cellLacCid.cid} }] }`
+              "cells": [{ "lac": cellLacCid.lac, "cid": cellLacCid.cid }] })
           }
 
          $.ajax(settings).done(function (response) {
@@ -294,17 +292,19 @@
           map.getSource('track').setData(dronePath);
           map.getSource('lteTelemetry').setData(lteTelemetry);
 
-          //TODO: fix lac
-          cellInfo = getCellIdInfo({
-              "lac": mobileProvider.lac,
-              "cid": parsed.extra.cellid
-          });
+          if(trackCellTower && mobileProvider) {
+            //TODO: fix lac
+            cellInfo = getCellIdInfo({
+                "lac": mobileProvider.lac,
+                "cid": parsed.extra.cellid
+            });
 
-          cellTowerPosition.geometry.coordinates = [cellInfo.lon, cellInfo.lat];
-          map.getSource('cellTowerPosition').setData(cellTowerPosition);
+            cellTowerPosition.geometry.coordinates = [cellInfo.lon, cellInfo.lat];
+            map.getSource('cellTowerPosition').setData(cellTowerPosition);
 
-          cellTowerConnection.features[0].geometry.coordinates = [coord, [cellInfo.lon, cellInfo.lat] ];
-          map.getSource('cellTowerConnection').setData(cellTowerConnection);
+            cellTowerConnection.features[0].geometry.coordinates = [coord, [cellInfo.lon, cellInfo.lat] ];
+            map.getSource('cellTowerConnection').setData(cellTowerConnection);
+          }
 
           map.panTo(coord);
 
