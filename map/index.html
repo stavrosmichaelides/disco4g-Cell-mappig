@@ -50,6 +50,7 @@
   </div>
   <script>
     opencellIdToken = localStorage.getItem("uavpal-opencellidToken");
+    mobileProvider = JSON.parse(localStorage.getItem("uavpal-mobileprovider"));
 
     mapboxgl.accessToken = localStorage.getItem("uavpal-mapboxToken");
     var map = new mapboxgl.Map({
@@ -243,7 +244,12 @@
             "method": "POST",
             "headers": {},
             "processData": false,
-            "data": `{ "token": opencellIdToken, "radio": "gsm", "mcc": 310, "mnc": 260, "cells": [{ "lac": ${cellLacCid.lac}, "cid": ${cellLacCid.cid} }] }`
+            "data": `{ 
+              "token": opencellIdToken, 
+              "radio": "gsm", 
+              "mcc": mobileprovider.mcc, 
+              "mnc": mobileProvider.mnc, 
+              "cells": [{ "lac": ${cellLacCid.lac}, "cid": ${cellLacCid.cid} }] }`
           }
 
          $.ajax(settings).done(function (response) {
@@ -288,7 +294,7 @@
 
           //TODO: fix lac
           cellInfo = getCellIdInfo({
-              "lac": 12110,
+              "lac": mobileProvider.lac,
               "cid": parsed.extra.cellid
           });
 

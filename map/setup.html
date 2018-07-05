@@ -8,12 +8,18 @@
       $(document).ready(()=>{
         var mapboxTokenKey = "uavpal-mapboxToken";
         var opencellidTokenKey = "uavpal-opencellidToken";
+        var mobileProviderKey = "uavpal-mobileprovider";
 
         var mapboxToken = $('#mapboxToken'); 
         var opencellidToken = $('#opencellidToken'); 
 
         mapboxToken.val(localStorage.getItem(mapboxTokenKey));
         opencellidToken.val(localStorage.getItem(opencellidTokenKey));
+
+        mobileProvider = JSON.parse(localStorage.getItem(mobileProviderKey));
+        $('#mcc').val(mobileProvider.mcc);
+        $('#mnc').val(mobileProvider.mnc);
+        $('#lac').val(mobileProvider.lac);
 
 
         $('#saveMapboxToken').click(()=> {
@@ -22,6 +28,17 @@
 
         $('#saveOpencellidToken').click(()=> {
           localStorage.setItem(opencellidTokenKey, opencellidToken.val());
+        });
+
+        $('#mobileProviderInfo').submit(()=> { 
+          localStorage.setItem(mobileProviderKey,
+            JSON.stringify({
+              "mcc":$('#mcc').val(),
+              "mnc":$('#mnc').val(),
+              "lac":$('#lac').val()
+            })
+          );
+          return false;
         });
 
       });
@@ -40,5 +57,31 @@
     <input id="opencellidToken" type="text"/>
     <button id="saveOpencellidToken" type="button">Save OpenCellId Token</button> <br />
     <a target="_blank" href="https://opencellid.org">https://opencellid.org</a>
+
+    <p>
+    Get MCC, MNC and LAC values here <br />
+    <a target="_black" href="https://www.cellmapper.net">https://www.cellmapper.net</a>
+    <ol>
+      <li>Navigate to flying area</li>
+      <li>Click on a cell tower</li>
+      <li>It will show MCC/MCN/Region</li>
+    </ol>
+
+    <form id="mobileProviderInfo">
+      MCC (Mobile country code): <br />
+      <input name="mcc" id="mcc" type="text"/> <br />
+      MNC (Mobile network code): <br />
+      <input name="mnc" id="mnc" type="text"/> <br />
+      LAC/Region (Location area code): <br />
+      <input name="lac" id="lac" type="text"/> <br />
+      <input type="submit" value="Save MCC, MNC, LAC" />
+    </form>
+
+    Alternative MCC, MNC source: <br />
+    <a target="_blank" href="https://en.wikipedia.org/wiki/Mobile_country_code">https://en.wikipedia.org/wiki/Mobile_country_code</a> <br />
+
+    <p>
+    <a href="index.html">Ready to map!</a>
+   
   </body>
 </html>
