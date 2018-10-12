@@ -277,6 +277,17 @@
           var gBounds = h3.h3ToGeoBoundary(geohash, true);
 
           dronePosition.geometry.coordinates = coord;
+
+          var trailLength = url.searchParams.get("trailLength");
+          if (!trailLength) {
+            trailLength = -1;
+          }
+
+          if(trailLength > 0 && dronePath.features[0].geometry.coordinates.length > trailLength) {
+            dronePath.features[0].geometry.coordinates.shift();
+            lteTelemetry.features.shift();
+          }
+
           dronePath.features[0].geometry.coordinates.push(coord);
 
           lteTelemetry.features.push({
