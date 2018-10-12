@@ -6,6 +6,7 @@
   <title>Mapbox</title>
   <script src="https://api.tiles.mapbox.com/mapbox-gl-js/v0.45.0/mapbox-gl.js"></script>
   <script src="gps.js"></script>
+  <script src="h3.js"></script>
   <script src="jquery-3.3.1.min.js"> </script>
 
   <link href="https://api.tiles.mapbox.com/mapbox-gl-js/v0.45.0/mapbox-gl.css" rel="stylesheet">
@@ -145,12 +146,12 @@
         "type": 'geojson',
         "data": dronePath
       });
-      
+
       map.addSource('lteTelemetry', {
         "type": "geojson",
         "data": lteTelemetry
       });
-      
+
       map.addLayer({
         "id": "track",
         "type": "line",
@@ -196,16 +197,10 @@
       }
     map.addLayer({
         "id": "lte-signal",
-        "type": "circle",
+        "type": "fill",
         "source": "lteTelemetry",
         "paint": {
-           "circle-radius": [
-              "interpolate", ["linear"], ["zoom"],
-              4, 1,
-              14, 8,
-              16, 10
-           ],
-           "circle-color": {
+           "fill-color": {
               "property" : "bar",
               "stops": [
                 [1, "rgba(255,   0, 0, 0.4)"],
@@ -277,13 +272,22 @@
         var gps = new GPS;
         gps.on('data', function (parsed) {
           var coord = [parsed.lon, parsed.lat];
+          var geohash = h3.geoToH3(parsed.lat, parsed.lon, 11);
+
+          var gBounds = h3.h3ToGeoBoundary(geohash, true);
+
           dronePosition.geometry.coordinates = coord;
           dronePath.features[0].geometry.coordinates.push(coord);
-          
+
           lteTelemetry.features.push({
             "type": "Feature", 
             "properties": parsed.extra, 
-            "geometry": { "type": "Point", "coordinates": coord }
+            "geometry": {
+              "type": "Polygon",
+              "coordinates": [
+                gBounds
+              ]
+            }
           });
 
           telemetry.innerHTML = `speed:${parsed.speed}<br/>heading:${parsed.track}`; 
